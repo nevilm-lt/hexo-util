@@ -2,8 +2,7 @@
 
 const should = require('chai').should(); // eslint-disable-line
 const hljs = require('highlight.js');
-const Entities = require('html-entities').XmlEntities;
-const entities = new Entities();
+const entities = require('html-entities');
 const validator = require('html-tag-validator');
 
 const testJson = {
@@ -13,7 +12,7 @@ const testJson = {
 
 const testString = JSON.stringify(testJson, null, '  ');
 
-const start = '<figure class="highlight plain"><table><tr>';
+const start = '<figure class="highlight plaintext"><table><tr>';
 const end = '</tr></table></figure>';
 
 const gutterStart = '<td class="gutter"><pre>';
@@ -38,7 +37,9 @@ function code(str, lang) {
   let data;
 
   if (lang) {
-    data = hljs.highlight(lang.toLowerCase(), str);
+    data = hljs.highlight(str, {
+      language: lang.toLowerCase()
+    });
   } else if (lang === null) {
     data = {value: str};
   } else {
@@ -94,7 +95,7 @@ describe('highlight', () => {
   it('wrap: false (without hljs, without lang)', done => {
     const result = highlight(testString, {gutter: false, wrap: false});
     result.should.eql([
-      '<pre><code class="highlight plain">',
+      '<pre><code class="highlight plaintext">',
       entities.encode(testString),
       '</code></pre>'
     ].join(''));
@@ -104,7 +105,7 @@ describe('highlight', () => {
   it('wrap: false (with hljs, without lang)', done => {
     const result = highlight(testString, {gutter: false, wrap: false, hljs: true});
     result.should.eql([
-      '<pre><code class="hljs plain">',
+      '<pre><code class="hljs plaintext">',
       entities.encode(testString),
       '</code></pre>'
     ].join(''));
@@ -116,7 +117,9 @@ describe('highlight', () => {
     hljs.configure({classPrefix: ''});
     result.should.eql([
       '<pre><code class="highlight json">',
-      hljs.highlight('json', testString).value,
+      hljs.highlight(testString, {
+        language: 'json'
+      }).value,
       '</code></pre>'
     ].join(''));
     validateHtmlAsync(result, done);
@@ -127,8 +130,36 @@ describe('highlight', () => {
     hljs.configure({classPrefix: 'hljs-'});
     result.should.eql([
       '<pre><code class="hljs json">',
-      hljs.highlight('json', testString).value,
+      hljs.highlight(testString, {
+        language: 'json'
+      }).value,
       '</code></pre>'
+    ].join(''));
+    validateHtmlAsync(result, done);
+  });
+
+  it('wrap: false (with mark)', done => {
+    const result = highlight(testString, {gutter: false, wrap: false, hljs: true, lang: 'json', mark: '1'});
+    hljs.configure({classPrefix: 'hljs-'});
+    result.should.eql([
+      '<pre><code class="hljs json">',
+      hljs.highlight(testString, {
+        language: 'json'
+      }).value.replace('<span class="hljs-punctuation">{</span>', '<mark><span class="hljs-punctuation">{</span></mark>'),
+      '</code></pre>'
+    ].join(''));
+    validateHtmlAsync(result, done);
+  });
+
+  it('wrap: false (retain trailing newline)', done => {
+    const result = highlight(testString + '\n', {gutter: false, wrap: false, hljs: true, lang: 'json'});
+    hljs.configure({classPrefix: 'hljs-'});
+    result.should.eql([
+      '<pre><code class="hljs json">',
+      hljs.highlight(testString, {
+        language: 'json'
+      }).value,
+      '\n</code></pre>'
     ].join(''));
     validateHtmlAsync(result, done);
   });
@@ -172,12 +203,13 @@ describe('highlight', () => {
   // it('don\'t highlight if parse failed'); missing-unit-test
 
   it('caption', done => {
+    const caption = 'hello world';
     const result = highlight(testString, {
-      caption: 'hello world'
+      caption
     });
 
     result.should.eql([
-      '<figure class="highlight plain"><figcaption>hello world</figcaption><table><tr>',
+      `<figure class="highlight plaintext"><figcaption>${caption}</figcaption><table><tr>`,
       gutter(1, 4),
       code(testString),
       end
@@ -185,7 +217,26 @@ describe('highlight', () => {
     validateHtmlAsync(result, done);
   });
 
+  it('caption (wrap: false)', done => {
+    const caption = 'hello world';
+    const result = highlight(testString, {
+      gutter: false,
+      wrap: false,
+      caption
+    });
+
+    result.should.eql([
+      '<pre>',
+      `<div class="caption">${caption}</div>`,
+      '<code class="highlight plaintext">',
+      entities.encode(testString),
+      '</code></pre>'
+    ].join(''));
+    validateHtmlAsync(result, done);
+  });
+
   it('tab', done => {
+    const spaces = '  ';
     const str = [
       'function fib(i){',
       '\tif (i <= 1) return i;',
@@ -193,13 +244,28 @@ describe('highlight', () => {
       '}'
     ].join('\n');
 
-    const result = highlight(str, {tab: '  ', lang: 'js'});
+    const result = highlight(str, {tab: spaces, lang: 'js'});
 
     result.should.eql([
       '<figure class="highlight js"><table><tr>',
       gutter(1, 4),
-      code(str.replace(/\t/g, '  '), 'js'),
+      code(str.replace(/\t/g, spaces), 'js'),
       end
+    ].join(''));
+    validateHtmlAsync(result, done);
+  });
+
+  it('tab with wrap:false', done => {
+    const spaces = '  ';
+    const result = highlight('\t' + testString, {gutter: false, wrap: false, hljs: true, lang: 'json', tab: spaces});
+    hljs.configure({classPrefix: 'hljs-'});
+    result.should.eql([
+      '<pre><code class="hljs json">',
+      spaces,
+      hljs.highlight(testString, {
+        language: 'json'
+      }).value,
+      '</code></pre>'
     ].join(''));
     validateHtmlAsync(result, done);
   });
@@ -220,13 +286,22 @@ describe('highlight', () => {
 
   it('highlight sublanguages', done => {
     const str = '<node><?php echo "foo"; ?></node>';
-    const result = highlight(str, {lang: 'xml'});
+    const result = highlight(str, { autoDetect: true });
     result.should.eql([
-      '<figure class="highlight xml"><table><tr>',
+      '<figure class="highlight php-template"><table><tr>',
       gutter(1, 1),
-      code('<span class="tag">&lt;<span class="name">node</span>&gt;</span><span class="php"><span class="meta">&lt;?php</span> <span class="keyword">echo</span> <span class="string">"foo"</span>; <span class="meta">?&gt;</span></span><span class="tag">&lt;/<span class="name">node</span>&gt;</span>', null),
+      code('<span class="language-xml"><span class="tag">&lt;<span class="name">node</span>&gt;</span></span><span class="language-php"><span class="meta">&lt;?php</span> <span class="keyword">echo</span> <span class="string">&quot;foo&quot;</span>; <span class="meta">?&gt;</span></span><span class="language-xml"><span class="tag">&lt;/<span class="name">node</span>&gt;</span></span>', null),
       end
     ].join(''));
+    validateHtmlAsync(result, done);
+  });
+
+  // https://github.com/hexojs/hexo/issues/4726
+  it('highlight sublanguages with tab', done => {
+    const spaces = '  ';
+    const str = '<script>\n\tfunction a() {\n\t\treturn;\n\t}\n</script>';
+    const result = highlight(str, { tab: spaces, autoDetect: true });
+    result.should.not.include('\t');
     validateHtmlAsync(result, done);
   });
 
@@ -280,9 +355,9 @@ describe('highlight', () => {
 
     const result = highlight(str, {autoDetect: true});
     result.should.eql([
-      '<figure class="highlight javascript"><table><tr>',
+      '<figure class="highlight typescript"><table><tr>',
       gutter(1, 6),
-      code('<span class="meta">"use strict"</span>;\n<span class="keyword">var</span> string = <span class="string">`</span>\n<span class="string">  Multi</span>\n<span class="string"></span>\n<span class="string">  string</span>\n<span class="string">`</span>', null),
+      code('<span class="meta">&quot;use strict&quot;</span>;</span><br><span class="line"><span class="keyword">var</span> <span class="built_in">string</span> = <span class="string">`</span></span><br><span class="line"><span class="string">  Multi</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">  string</span></span><br><span class="line"><span class="string">`</span>', null),
       end
     ].join(''));
     validateHtmlAsync(result, done);
@@ -317,7 +392,7 @@ describe('highlight', () => {
     result.should.include(gutterStart);
     result.should.include(codeStart);
     result.should.include('code class="hljs javascript"');
-    result.should.include('class="hljs-function"');
+    result.should.include('class="hljs-keyword"');
     result.should.include(gutter(1, 5));
     validateHtmlAsync(result, done);
   });
@@ -334,7 +409,7 @@ describe('highlight', () => {
     result.should.not.include(gutterStart);
     result.should.not.include(codeStart);
     result.should.include('code class="hljs javascript"');
-    result.should.include('class="hljs-function"');
+    result.should.include('class="hljs-keyword"');
     validateHtmlAsync(result, done);
   });
 
@@ -350,7 +425,7 @@ describe('highlight', () => {
     result.should.not.include(gutterStart);
     result.should.include(codeStart);
     result.should.include('code class="hljs javascript"');
-    result.should.include('class="hljs-function"');
+    result.should.include('class="hljs-keyword"');
     validateHtmlAsync(result, done);
   });
 });
