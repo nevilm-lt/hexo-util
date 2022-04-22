@@ -77,8 +77,8 @@ describe('prismHighlight', () => {
       '}'
     ].join('\n');
 
-    // Use language: 'plain' to simplify the test
-    const result = prismHighlight(input, { tab: '  ', lang: 'plain' });
+    // Use language: 'plain-text' for not supported language with Prism
+    const result = prismHighlight(input, { tab: '  ', lang: 'plain-text' });
 
     result.should.contains(escapeHTML(input.replace(/\t/g, '  ')));
 
@@ -150,7 +150,7 @@ describe('prismHighlight', () => {
          - using 32 bit cells causes an overflow after several millions of digits
 
         It's about ~38 times shorter than pi16.b, ~364 times faster and works with
-        not-wrapping (bignum) implementations. 
+        not-wrapping (bignum) implementations.
 
         by Felix Nawothnig (felix.nawothnig@t-online.de) ]
 
@@ -229,7 +229,7 @@ describe('prismHighlight', () => {
          - using 32 bit cells causes an overflow after several millions of digits
 
         It's about ~38 times shorter than pi16.b, ~364 times faster and works with
-        not-wrapping (bignum) implementations. 
+        not-wrapping (bignum) implementations.
 
         by Felix Nawothnig (felix.nawothnig@t-online.de) ]
 
@@ -292,7 +292,7 @@ describe('prismHighlight', () => {
          - using 32 bit cells causes an overflow after several millions of digits
 
         It's about ~38 times shorter than pi16.b, ~364 times faster and works with
-        not-wrapping (bignum) implementations. 
+        not-wrapping (bignum) implementations.
 
         by Felix Nawothnig (felix.nawothnig@t-online.de) ]
 
@@ -320,4 +320,19 @@ describe('prismHighlight', () => {
     // Only validate the result2
     validateHtmlAsync(result2, done);
   });
+
+  it('caption', done => {
+    const input = `
+    {
+      "foo": 1,
+      "bar": 2
+    }`;
+    const caption = 'foo';
+    const result = prismHighlight(input, { caption });
+
+    result.should.contains('<div class="caption">' + caption + '</div>');
+
+    validateHtmlAsync(result, done);
+  });
+
 });
