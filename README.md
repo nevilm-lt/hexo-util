@@ -1,6 +1,6 @@
 # hexo-util
 
-[![Build Status](https://travis-ci.com/hexojs/hexo-util.svg?branch=master)](https://travis-ci.com/hexojs/hexo-util)
+[![Build Status](https://github.com/hexojs/hexo-util/workflows/Tester/badge.svg?branch=master)](https://github.com/hexojs/hexo-util/actions?query=workflow%3ATester)
 [![NPM version](https://badge.fury.io/js/hexo-util.svg)](https://www.npmjs.com/package/hexo-util)
 [![Coverage Status](https://coveralls.io/repos/hexojs/hexo-util/badge.svg?branch=master&service=github)](https://coveralls.io/github/hexojs/hexo-util?branch=master)
 [![dependencies Status](https://david-dm.org/hexojs/hexo-util/status.svg)](https://david-dm.org/hexojs/hexo-util)
@@ -12,6 +12,7 @@ Utilities for [Hexo].
 
 - [Installation](#installation)
 - [Usage](#usage)
+- [Cache](#cache)
 - [CacheStream](#cachestream)
 - [camelCaseKeys](#camelcasekeysobj-options)
 - [createSha1Hash](#createsha1hash)
@@ -30,11 +31,13 @@ Utilities for [Hexo].
 - [Pattern](#patternrule)
 - [Permalink](#permalinkrule-options)
 - [prettyUrls](#prettyurlsurl-options)
+- [prismHighlight](#prismhighlightstr-options)
 - [relative_url](#relative_urlfrom-to)
 - [slugize](#slugizestr-options)
 - [spawn](#spawncommand-args-options)
 - [stripHTML](#striphtmlstr)
 - [wordWrap](#wordwrapstr-options)
+- [tocObj](#tocobjstr-options)
 - [truncate](#truncatestr-options)
 - [unescapeHTML](#unescapehtmlstr)
 - [url_for](#url_forpath-option)
@@ -50,6 +53,63 @@ $ npm install hexo-util --save
 
 ``` js
 var util = require('hexo-util');
+```
+
+### Cache()
+
+A simple plain object cache
+
+``` js
+const cache = new Cache();
+
+// set(key, value)
+cache.set('foo', 'bar');
+
+// get(key) => value
+cache.get('foo');
+// 'bar'
+
+// has(key) => Boolean
+cache.has('foo');
+// true
+cache.has('bar');
+// false
+
+// apply(key. value)
+cache.apply('baz', () => 123);
+// 123
+cache.apply('baz', () => 456);
+// 123
+cache.apply('qux', 456);
+// 456
+cache.apply('qux', '789');
+// 456
+
+// size()
+cache.size();
+// 3
+
+// dump()
+cache.dump();
+/*
+{
+  foo: 'bar',
+  baz: 123,
+  qux: 456
+}
+*/
+
+// del(key)
+cache.del('baz');
+cache.has('baz');
+// false
+
+// flush()
+cache.flush();
+cache.has('foo');
+// false
+cache.size();
+// 0
 ```
 
 ### CacheStream()
@@ -215,21 +275,6 @@ hash('123456');
 // <Buffer 7c 4a 8d 09 ca 37 62 af 61 e5 95 20 94 3d c2 64 94 f8 94 1b>
 ```
 
-### HashStream()
-**\[deprecated\]** use [`createSha1Hash()`](#createsha1hash).
-
-Generates SHA1 hash with a transform stream.
-
-``` js
-var stream = new HashStream();
-
-fs.createReadStream('/path/to/file')
-  .pipe(stream)
-  .on('finish', function(){
-    console.log(stream.read());
-  });
-```
-
 ### highlight(str, [options])
 
 Syntax highlighting for a code block.
@@ -243,7 +288,7 @@ Option | Description | Default
 `lang` | Language |
 `caption` | Caption |
 `tab`| Replace tabs |
-`autoDetect` | Detect language automatically | false
+`autoDetect` | Detect language automatically (warning: slow)<br>_Sublanguage highlight requires `autoDetect` to be enabled and `lang` to be unset_  | false
 `mark` | Line highlight specific line(s) |
 
 ### htmlTag(tag, attrs, text, escape)
@@ -394,6 +439,24 @@ prettyUrls('/foo/bar/index.html', { trailing_index: false, trailing_html: false 
 // /foo/bar/
 ```
 
+### prismHighlight(str, [options])
+
+Syntax highlighting for a code block using PrismJS.
+
+Option | Description | Default
+--- | --- | ---
+`lineNumber` | Whether to show line numbers | true
+`lang` | Language | `'none'`
+`tab`| Replace tabs |
+`isPreprocess` | Enable preprocess or not | true
+`mark` | Highlight specific line |
+`firstLine` | First line number |
+`caption` | Caption |
+
+When `isPreprocess` is enabled, `prismHighlight()` will return PrismJS processed HTML snippet. Otherwise `str` will only be escaped and `prismHighlight()` will return the HTML snippet that is suitable for `prism.js` working in the Browser.
+
+`mark` and `firstLine` options will have effect only when `isPreprocess` is disabled.
+
 ### relative_url(from, to)
 
 Returns the relative URL from `from` to `to`. Output is [encoded](#encodeurlstr) automatically. Requires [`bind(hexo)`](#bindhexo).
@@ -428,15 +491,23 @@ Option | Description | Default
 --- | --- | ---
 `cwd` | Current working directory of the child process |
 `env` | Environment key-value pairs |
-`stdio` | Child's stdio configuration |
+`stdio` | Child's stdio configuration | `pipe`
 `detached` | The child will be a process group leader |
 `uid` | Sets the user identity of the process |
 `gid` | Sets the group identity of the process |
 `verbose` | Display messages on the console | `false`
 `encoding` | Sets the encoding of the output string | `utf8`
 
+More info: [`child_process.spawn()`](https://nodejs.org/api/child_process.html#child_process_child_process_spawn_command_args_options)
+
 ``` js
-spawn('cat', 'test.txt').then(function(content){
+spawn('cat', 'test.txt').then((content) => {
+  console.log(content);
+});
+
+// $ cd "/target/folder"
+// $ cat "foo.txt" "bar.txt"
+spawn('cat', ['foo.txt', 'bar.txt'], { cwd: '/target/folder' }).then((content) => {
   console.log(content);
 });
 ```
@@ -444,6 +515,10 @@ spawn('cat', 'test.txt').then(function(content){
 ### stripHTML(str)
 
 Removes HTML tags in a string.
+
+### stripIndent(str)
+
+Strip leading whitespace from each line in a string. The line with the least number of leading whitespace, ignoring empty lines, determines the number to remove. Useful for removing redundant indentation.
 
 ### wordWrap(str, [options])
 
@@ -465,6 +540,74 @@ wordWrap('Once upon a time', {width: 8})
 
 wordWrap('Once upon a time', {width: 1})
 // Once\nupon\na\ntime
+```
+
+### tocObj(str, [options])
+
+Generate a table of contents in JSON format based on the given html string. Headings with attribute `data-toc-unnumbered="true"` will be marked as unnumbered.
+
+Option | Description | Default
+--- | --- | ---
+`min_depth` | The minimum level of TOC | 1
+`max_depth` | The maximum level of TOC | 6
+
+
+``` js
+const html = [
+  '<h1 id="title_1">Title 1</h1>',
+  '<div id="title_1_1"><h2>Title 1.1</h2></div>',
+  '<h3 id="title_1_1_1">Title 1.1.1</h3>',
+  '<h2 id="title_1_2">Title 1.2</h2>',
+  '<h2 id="title_1_3">Title 1.3</h2>',
+  '<h3 id="title_1_3_1">Title 1.3.1</h3>',
+  '<h1 id="title_2">Title 2</h1>',
+  '<h2 id="title_2_1">Title 2.1</h2>'
+].join('\n');
+
+tocObj(html);
+/*
+[
+  { text: 'Title 1', id: 'title_1', level: 1 },
+  { text: 'Title 1.1', id: 'title_1_1', level: 2 },
+  { text: 'Title 1.1.1', id: 'title_1_1_1', level: 3 },
+  { text: 'Title 1.2', id: 'title_1_2', level: 2 },
+  { text: 'Title 1.3', id: 'title_1_3', level: 2 },
+  { text: 'Title 1.3.1', id: 'title_1_3_1', level: 3 },
+  { text: 'Title 2', id: 'title_2', level: 1 },
+  { text: 'Title 2.1', id: 'title_2_1', level: 2 },
+]
+*/
+
+tocObj(html, { min_depth: 2 });
+/*
+[
+  { text: 'Title 1.1', id: 'title_1_1', level: 2 },
+  { text: 'Title 1.1.1', id: 'title_1_1_1', level: 3 },
+  { text: 'Title 1.2', id: 'title_1_2', level: 2 },
+  { text: 'Title 1.3', id: 'title_1_3', level: 2 },
+  { text: 'Title 1.3.1', id: 'title_1_3_1', level: 3 },
+  { text: 'Title 2.1', id: 'title_2_1', level: 2 },
+]
+*/
+
+tocObj(html, { max_depth: 2 });
+/*
+[
+  { text: 'Title 1', id: 'title_1', level: 1 },
+  { text: 'Title 1.1', id: 'title_1_1', level: 2 },
+  { text: 'Title 1.2', id: 'title_1_2', level: 2 },
+  { text: 'Title 1.3', id: 'title_1_3', level: 2 },
+  { text: 'Title 2', id: 'title_2', level: 1 },
+  { text: 'Title 2.1', id: 'title_2_1', level: 2 },
+]
+*/
+
+tocObj('<h1 id="reference" data-toc-unnumbered="true">Reference</h1>')
+/*
+[
+  { text: 'Reference', id: 'reference', level: 1, unnumbered: true }
+]
+*/
 ```
 
 ### truncate(str, [options])
