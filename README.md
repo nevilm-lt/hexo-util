@@ -1,6 +1,6 @@
 # hexo-util
 
-[![Build Status](https://travis-ci.com/hexojs/hexo-util.svg?branch=master)](https://travis-ci.com/hexojs/hexo-util)
+[![Build Status](https://github.com/hexojs/hexo-util/workflows/Tester/badge.svg?branch=master)](https://github.com/hexojs/hexo-util/actions?query=workflow%3ATester)
 [![NPM version](https://badge.fury.io/js/hexo-util.svg)](https://www.npmjs.com/package/hexo-util)
 [![Coverage Status](https://coveralls.io/repos/hexojs/hexo-util/badge.svg?branch=master&service=github)](https://coveralls.io/github/hexojs/hexo-util?branch=master)
 [![dependencies Status](https://david-dm.org/hexojs/hexo-util/status.svg)](https://david-dm.org/hexojs/hexo-util)
@@ -451,6 +451,7 @@ Option | Description | Default
 `isPreprocess` | Enable preprocess or not | true
 `mark` | Highlight specific line |
 `firstLine` | First line number |
+`caption` | Caption |
 
 When `isPreprocess` is enabled, `prismHighlight()` will return PrismJS processed HTML snippet. Otherwise `str` will only be escaped and `prismHighlight()` will return the HTML snippet that is suitable for `prism.js` working in the Browser.
 
@@ -490,15 +491,23 @@ Option | Description | Default
 --- | --- | ---
 `cwd` | Current working directory of the child process |
 `env` | Environment key-value pairs |
-`stdio` | Child's stdio configuration |
+`stdio` | Child's stdio configuration | `pipe`
 `detached` | The child will be a process group leader |
 `uid` | Sets the user identity of the process |
 `gid` | Sets the group identity of the process |
 `verbose` | Display messages on the console | `false`
 `encoding` | Sets the encoding of the output string | `utf8`
 
+More info: [`child_process.spawn()`](https://nodejs.org/api/child_process.html#child_process_child_process_spawn_command_args_options)
+
 ``` js
-spawn('cat', 'test.txt').then(function(content){
+spawn('cat', 'test.txt').then((content) => {
+  console.log(content);
+});
+
+// $ cd "/target/folder"
+// $ cat "foo.txt" "bar.txt"
+spawn('cat', ['foo.txt', 'bar.txt'], { cwd: '/target/folder' }).then((content) => {
   console.log(content);
 });
 ```
@@ -535,7 +544,7 @@ wordWrap('Once upon a time', {width: 1})
 
 ### tocObj(str, [options])
 
-Generate a table of contents in JSON format based on the given html string.
+Generate a table of contents in JSON format based on the given html string. Headings with attribute `data-toc-unnumbered="true"` will be marked as unnumbered.
 
 Option | Description | Default
 --- | --- | ---
@@ -590,6 +599,13 @@ tocObj(html, { max_depth: 2 });
   { text: 'Title 1.3', id: 'title_1_3', level: 2 },
   { text: 'Title 2', id: 'title_2', level: 1 },
   { text: 'Title 2.1', id: 'title_2_1', level: 2 },
+]
+*/
+
+tocObj('<h1 id="reference" data-toc-unnumbered="true">Reference</h1>')
+/*
+[
+  { text: 'Reference', id: 'reference', level: 1, unnumbered: true }
 ]
 */
 ```
